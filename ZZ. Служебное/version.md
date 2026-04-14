@@ -1,7 +1,7 @@
 # Версия хранилища
 
 Текущая: v0.1
-Репозиторий: [PLACEHOLDER]
+Репозиторий: https://github.com/alrodionov-web/vault-for-practitioners
 
 ## Что нового
 
