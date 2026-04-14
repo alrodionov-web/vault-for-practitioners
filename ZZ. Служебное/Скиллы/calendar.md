@@ -1,39 +1,70 @@
 # Скилл: calendar
 
-Показывает расписание на день из подключенного календаря. Только чтение.
+## CRITICAL: Правила
 
-## Быстрый сценарий
+- Прочитать `ZZ. Служебное/calendar-config.md` ПЕРВЫМ ДЕЛОМ
+- Способ доступа определяется полем "Способ" в конфиге: `caldav`, `ics` или `текст`
+- Если не подключен -> запустить онбординг из `calendar-config.md`
+- НЕ ДОДУМЫВАТЬ содержание событий - показывать только название и время
 
-### Шаг 1. Проверить подключение
+---
 
-1. Прочитать `ZZ. Служебное/calendar-config.md`
-2. Если `ics_url` заполнен - загрузить календарь:
-   ```shell
-   source "ZZ. Служебное/venv/.venv/bin/activate"
-   python3 -c "
-   import urllib.request, icalendar
-   from datetime import date, datetime, timezone
-   data = urllib.request.urlopen('[ICS_URL]').read()
-   cal = icalendar.Calendar.from_ical(data)
-   today = date.today()
-   for event in cal.walk('VEVENT'):
-       start = event.get('DTSTART').dt
-       if hasattr(start, 'date'):
-           d = start.date()
-       else:
-           d = start
-       if d == today:
-           print(f'{start} | {event.get(\"SUMMARY\")}')
-   "
-   ```
-3. Если `ics_url` пуст - запустить onboarding (см. `calendar-config.md`, секция "Первое подключение")
+## Чтение событий
 
-### Шаг 2. Структурированный ответ
+### Способ: CalDAV
 
-Сформировать:
-- Сколько событий сегодня
-- Ближайшее событие
-- Окна для фокусной работы между событиями
+Запрос REPORT для получения событий на период:
+
+```
+curl -s -u "ЛОГИН:ПАРОЛЬ" -X REPORT \
+  -H "Content-Type: application/xml" \
+  -H "Depth: 1" \
+  -d '<?xml version="1.0" encoding="UTF-8"?>
+<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop><d:getetag/><c:calendar-data/></d:prop>
+  <c:filter>
+    <c:comp-filter name="VCALENDAR">
+      <c:comp-filter name="VEVENT">
+        <c:time-range start="YYYYMMDDT000000Z" end="YYYYMMDDT235959Z"/>
+      </c:comp-filter>
+    </c:comp-filter>
+  </c:filter>
+</c:calendar-query>' \
+  "CALDAV_URL"
+```
+
+### Способ: ICS
+
+Загрузить ICS через `fetch` и распарсить VEVENT блоки на нужную дату.
+
+### Способ: текст
+
+Спросить: "Какие встречи и сессии сегодня?"
+
+---
+
+## Добавление событий (только CalDAV)
+
+```
+curl -s -u "ЛОГИН:ПАРОЛЬ" -X PUT \
+  -H "Content-Type: text/calendar" \
+  -d 'BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:YYYYMMDDTHHMMSS
+DTEND:YYYYMMDDTHHMMSS
+SUMMARY:Название
+UID:UNIQUE-ID@vault
+END:VEVENT
+END:VCALENDAR' \
+  "CALDAV_URL/UNIQUE-ID.ics"
+```
+
+Если способ `ics` или `текст` -> сообщить: "Для добавления событий нужен CalDAV. Хотите настроить?"
+
+---
+
+## Формат ответа
 
 ```
 # Календарь на сегодня (YYYY-MM-DD)
@@ -44,21 +75,9 @@
 
 ## Окна для фокуса
 - HH:MM-HH:MM (N мин)
-- ...
 ```
-
-### Шаг 3. Интеграция с планированием
-
-В конце предложить:
-- Показать задачи из недельного плана на сегодня
-- Сохранить план дня в `01. Планирование/YYYY/MM/YYYY-MM-DD.md`
-
-## Если календарь не подключен
-
-Спросить: "Расскажите, какие встречи и сессии у вас сегодня?" и работать с текстовым вводом.
 
 ## Правила
 
-- Только чтение. ICS-ссылка не позволяет менять события.
-- Для клиентских событий не используй реальные ФИО - только псевдонимы/инициалы.
-- Если данных нет - `[PLACEHOLDER]`, не выдумывай.
+- Для клиентских событий не использовать реальные ФИО
+- Если данных нет - `[PLACEHOLDER]`, не выдумывать
